@@ -1,39 +1,41 @@
 /* =============================================
    MS Cabs – script.js
-   Booking form + Leaflet map (pickup/drop)
+   Leaflet map + Nominatim autocomplete
 ============================================= */
 
-// ── Nominatim helpers ─────────────────────────────────────────────────────────────
-const NOM_SEARCH  = 'https://nominatim.openstreetmap.org/search';
-const NOM_REVERSE = 'https://nominatim.openstreetmap.org/reverse';
+// ── Nominatim helpers ──────────────────────────────────────────────────────────
+const NOM = 'https://nominatim.openstreetmap.org';
 
-async function geocodeAddress(query) {
-    const url = `${NOM_SEARCH}?q=${encodeURIComponent(query)}&format=jsonv2&limit=1&countrycodes=in`;
-    const res  = await fetch(url, { headers: { 'Accept-Language': 'en' } });
-    if (!res.ok) throw new Error('Geocoding failed');
-    const data = await res.json();
-    if (!data.length) throw new Error('Address not found');
-    return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon), display: data[0].display_name };
+async function nominatimSearch(query, limit = 5) {
+    const url = `${NOM}/search?q=${encodeURIComponent(query)}&format=jsonv2&limit=${limit}&countrycodes=in&addressdetails=1`;
+    const r = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+    if (!r.ok) return [];
+    return r.json();
 }
 
-async function reverseGeocode(lat, lng) {
-    const url = `${NOM_REVERSE}?lat=${lat}&lon=${lng}&format=jsonv2`;
-    const res  = await fetch(url, { headers: { 'Accept-Language': 'en' } });
-    if (!res.ok) throw new Error('Reverse geocoding failed');
-    const data = await res.json();
-    return data.display_name || `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+async function nominatimReverse(lat, lng) {
+    const url = `${NOM}/reverse?lat=${lat}&lon=${lng}&format=jsonv2`;
+    const r = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+    if (!r.ok) throw new Error('reverse failed');
+    const d = await r.json();
+    return d.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
 }
 
 function osmPinUrl(lat, lng) {
     return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=16/${lat}/${lng}`;
 }
-
 function osmRouteUrl(pLat, pLng, dLat, dLng) {
     return `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${pLat},${pLng};${dLat},${dLng}`;
 }
 
+// ── Debounce util ─────────────────────────────────────────────────────────────────
+function debounce(fn, ms) {
+    let t;
+    return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+
 // ── App state ───────────────────────────────────────────────────────────────────
-let map = null;
+let map         = null;
 let ICON_PICKUP = null;
 let ICON_DROP   = null;
 
@@ -45,118 +47,108 @@ const state = {
     mode: 'pickup'
 };
 
-// ── Create icons (only after Leaflet loaded) ─────────────────────────────────
+// ── Build Leaflet icons (must be called after L is available) ─────────────────
 function buildIcons() {
-    function makeIcon(color, label) {
+    function pin(color, label) {
         return L.divIcon({
             className: '',
-            html: `<div class="map-pin" style="--pin-color:${color}" title="${label}">
-                     <svg viewBox="0 0 24 24" fill="${color}" xmlns="http://www.w3.org/2000/svg">
-                       <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5s2.5 1.12 2.5 2.5S13.38 11.5 12 11.5z"/>
+            html: `<div class="map-pin" title="${label}">
+                     <svg viewBox="0 0 24 32" xmlns="http://www.w3.org/2000/svg">
+                       <path d="M12 0C7.58 0 4 3.58 4 8c0 6 8 16 8 16s8-10 8-16c0-4.42-3.58-8-8-8z"
+                             fill="${color}" stroke="#fff" stroke-width="1.2"/>
+                       <circle cx="12" cy="8" r="3" fill="#fff"/>
                      </svg>
                    </div>`,
-            iconSize:    [32, 42],
-            iconAnchor:  [16, 42],
-            popupAnchor: [0, -44]
+            iconSize:    [28, 38],
+            iconAnchor:  [14, 38],
+            popupAnchor: [0, -40]
         });
     }
-    ICON_PICKUP = makeIcon('#22c55e', 'Pickup');
-    ICON_DROP   = makeIcon('#ef4444', 'Drop');
+    ICON_PICKUP = pin('#22c55e', 'Pickup');
+    ICON_DROP   = pin('#ef4444', 'Drop');
 }
 
-// ── Map init ─────────────────────────────────────────────────────────────────
+// ── Map init ────────────────────────────────────────────────────────────────
 function initMap() {
-    // Guard: if Leaflet not loaded skip gracefully
     if (typeof L === 'undefined') {
-        console.warn('Leaflet not loaded – map disabled');
-        const mapEl = document.getElementById('map');
-        if (mapEl) mapEl.innerHTML = '<p style="padding:20px;text-align:center;color:#666">Map unavailable – please reload the page.</p>';
+        const el = document.getElementById('map');
+        if (el) el.innerHTML = '<p style="padding:20px;text-align:center;color:#666">Map could not load. Please check your internet connection and reload.</p>';
         return;
     }
 
-    buildIcons(); // safe to call now that L exists
+    buildIcons();
 
-    map = L.map('map', {
-        zoomControl:       true,
-        scrollWheelZoom:   false   // don't hijack page scroll
-    }).setView([12.2958, 76.6394], 12); // Mysore centre
+    map = L.map('map', { scrollWheelZoom: false })
+           .setView([12.2958, 76.6394], 12);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom:     19,
+        maxZoom: 19,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'
     }).addTo(map);
 
-    // Enable scroll zoom only when user clicks into map
     map.on('focus', () => map.scrollWheelZoom.enable());
     map.on('blur',  () => map.scrollWheelZoom.disable());
 
-    // Re-render tiles once container is fully visible
-    setTimeout(() => map.invalidateSize(), 300);
+    // Give the browser one frame to lay out the container then fix tile render
+    requestAnimationFrame(() => map.invalidateSize());
 
-    map.on('click', async function (e) {
-        if (state.mode === 'pickup') {
-            await setPickupCoords(e.latlng.lat, e.latlng.lng, true);
-        } else {
-            await setDropCoords(e.latlng.lat, e.latlng.lng, true);
-        }
+    map.on('click', async (e) => {
+        if (state.mode === 'pickup') await setPickupCoords(e.latlng.lat, e.latlng.lng, true);
+        else                         await setDropCoords(e.latlng.lat,   e.latlng.lng, true);
     });
 }
 
 // ── Place / move Pickup marker ─────────────────────────────────────────────────
-async function setPickupCoords(lat, lng, reverseAddr) {
+async function setPickupCoords(lat, lng, doReverse) {
     state.pickupCoords = { lat, lng };
-
     if (state.pickupMarker) {
         state.pickupMarker.setLatLng([lat, lng]);
     } else {
         state.pickupMarker = L.marker([lat, lng], { icon: ICON_PICKUP, draggable: true })
-            .addTo(map).bindPopup('<strong>🟢 Pickup</strong>');
+            .addTo(map).bindPopup('<strong>&#x1F7E2; Pickup</strong>');
         state.pickupMarker.on('dragend', async () => {
             const p = state.pickupMarker.getLatLng();
             await setPickupCoords(p.lat, p.lng, true);
         });
     }
     state.pickupMarker.openPopup();
-
-    if (reverseAddr) {
-        setCoordBadge('pickup', lat, lng, 'Resolving…');
+    if (doReverse) {
+        setCoordBadge('pickup', lat, lng, 'Locating…');
         try {
-            const addr = await reverseGeocode(lat, lng);
+            const addr = await nominatimReverse(lat, lng);
             document.getElementById('pickupAddress').value = addr;
+            hideSuggestions('pickup');
             setCoordBadge('pickup', lat, lng, addr.split(',').slice(0, 3).join(','));
         } catch { setCoordBadge('pickup', lat, lng, `${lat.toFixed(5)}, ${lng.toFixed(5)}`); }
     }
-
     updateHiddenFields();
     updateRouteLink();
     map.panTo([lat, lng]);
 }
 
-// ── Place / move Drop marker ───────────────────────────────────────────────────
-async function setDropCoords(lat, lng, reverseAddr) {
+// ── Place / move Drop marker ──────────────────────────────────────────────────
+async function setDropCoords(lat, lng, doReverse) {
     state.dropCoords = { lat, lng };
-
     if (state.dropMarker) {
         state.dropMarker.setLatLng([lat, lng]);
     } else {
         state.dropMarker = L.marker([lat, lng], { icon: ICON_DROP, draggable: true })
-            .addTo(map).bindPopup('<strong>🔴 Drop</strong>');
+            .addTo(map).bindPopup('<strong>&#x1F534; Drop</strong>');
         state.dropMarker.on('dragend', async () => {
             const p = state.dropMarker.getLatLng();
             await setDropCoords(p.lat, p.lng, true);
         });
     }
     state.dropMarker.openPopup();
-
-    if (reverseAddr) {
-        setCoordBadge('drop', lat, lng, 'Resolving…');
+    if (doReverse) {
+        setCoordBadge('drop', lat, lng, 'Locating…');
         try {
-            const addr = await reverseGeocode(lat, lng);
+            const addr = await nominatimReverse(lat, lng);
             document.getElementById('destination').value = addr;
+            hideSuggestions('drop');
             setCoordBadge('drop', lat, lng, addr.split(',').slice(0, 3).join(','));
         } catch { setCoordBadge('drop', lat, lng, `${lat.toFixed(5)}, ${lng.toFixed(5)}`); }
     }
-
     updateHiddenFields();
     updateRouteLink();
     map.panTo([lat, lng]);
@@ -172,7 +164,7 @@ function setCoordBadge(type, lat, lng, label) {
     link.href = osmPinUrl(lat, lng);
 }
 
-// ── Sync hidden fields ──────────────────────────────────────────────────────────────
+// ── Hidden fields + route link ─────────────────────────────────────────────────────
 function updateHiddenFields() {
     if (state.pickupCoords) {
         document.getElementById('pickupLat').value    = state.pickupCoords.lat.toFixed(7);
@@ -197,7 +189,7 @@ function updateRouteLink() {
         document.getElementById('routeMapUrl').value = url;
         link.href  = url;
         row.hidden = false;
-        map.fitBounds([
+        if (map) map.fitBounds([
             [state.pickupCoords.lat, state.pickupCoords.lng],
             [state.dropCoords.lat,   state.dropCoords.lng]
         ], { padding: [40, 40] });
@@ -206,22 +198,123 @@ function updateRouteLink() {
     }
 }
 
-// ── Button loading state ──────────────────────────────────────────────────────────
+// ── Autocomplete suggestions ─────────────────────────────────────────────────────
+let activeIndex = { pickup: -1, drop: -1 };
+
+function showSuggestions(type, results) {
+    const list = document.getElementById(`${type}Suggestions`);
+    if (!results.length) { hideSuggestions(type); return; }
+    activeIndex[type] = -1;
+    list.innerHTML = '';
+    results.forEach((item, i) => {
+        const li = document.createElement('li');
+        li.className = 'suggestion-item';
+        li.setAttribute('role', 'option');
+        li.setAttribute('aria-selected', 'false');
+        li.dataset.index = i;
+        const name = item.namedetails && item.namedetails.name
+            ? item.namedetails.name
+            : item.display_name.split(',')[0];
+        li.innerHTML = `<span class="sug-icon"><i class="fa-solid fa-location-dot"></i></span>
+                        <span class="sug-text">
+                          <strong>${name}</strong>
+                          <small>${item.display_name.split(',').slice(1, 4).join(',').trim()}</small>
+                        </span>`;
+        li.addEventListener('mousedown', (e) => {
+            e.preventDefault(); // keep focus on input
+            selectSuggestion(type, item);
+        });
+        list.appendChild(li);
+    });
+    list.hidden = false;
+}
+
+function hideSuggestions(type) {
+    const list = document.getElementById(`${type}Suggestions`);
+    list.hidden = true;
+    list.innerHTML = '';
+    activeIndex[type] = -1;
+}
+
+function highlightItem(type, index) {
+    const list  = document.getElementById(`${type}Suggestions`);
+    const items = list.querySelectorAll('.suggestion-item');
+    items.forEach((el, i) => {
+        el.classList.toggle('active', i === index);
+        el.setAttribute('aria-selected', i === index ? 'true' : 'false');
+    });
+}
+
+async function selectSuggestion(type, item) {
+    const lat  = parseFloat(item.lat);
+    const lng  = parseFloat(item.lon);
+    const addr = item.display_name;
+    if (type === 'pickup') {
+        document.getElementById('pickupAddress').value = addr;
+        hideSuggestions('pickup');
+        if (map) await setPickupCoords(lat, lng, false);
+        setCoordBadge('pickup', lat, lng, addr.split(',').slice(0, 3).join(','));
+    } else {
+        document.getElementById('destination').value = addr;
+        hideSuggestions('drop');
+        if (map) await setDropCoords(lat, lng, false);
+        setCoordBadge('drop', lat, lng, addr.split(',').slice(0, 3).join(','));
+    }
+    updateHiddenFields();
+}
+
+function setupAutocomplete(type, inputId) {
+    const input = document.getElementById(inputId);
+
+    const fetchSuggestions = debounce(async (q) => {
+        if (q.length < 3) { hideSuggestions(type); return; }
+        const results = await nominatimSearch(q, 6);
+        showSuggestions(type, results);
+    }, 350);
+
+    input.addEventListener('input', () => fetchSuggestions(input.value.trim()));
+
+    input.addEventListener('keydown', (e) => {
+        const list  = document.getElementById(`${type}Suggestions`);
+        const items = list.querySelectorAll('.suggestion-item');
+        if (list.hidden || !items.length) return;
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            activeIndex[type] = Math.min(activeIndex[type] + 1, items.length - 1);
+            highlightItem(type, activeIndex[type]);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            activeIndex[type] = Math.max(activeIndex[type] - 1, 0);
+            highlightItem(type, activeIndex[type]);
+        } else if (e.key === 'Enter') {
+            if (activeIndex[type] >= 0) {
+                e.preventDefault();
+                items[activeIndex[type]].dispatchEvent(new MouseEvent('mousedown'));
+            }
+        } else if (e.key === 'Escape') {
+            hideSuggestions(type);
+        }
+    });
+
+    input.addEventListener('blur', () => setTimeout(() => hideSuggestions(type), 150));
+}
+
+// ── Button loading ────────────────────────────────────────────────────────────────
 function btnLoading(btn, on) {
-    btn.disabled      = on;
+    btn.disabled = on;
     btn.style.opacity = on ? '0.55' : '1';
 }
 
 // ── DOMContentLoaded ───────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
 
-    // Minimum booking date = today
     document.getElementById('date').setAttribute('min', new Date().toISOString().split('T')[0]);
 
-    // ─ Init map ────────────────────────────────────────────────────────────
     initMap();
+    setupAutocomplete('pickup', 'pickupAddress');
+    setupAutocomplete('drop',   'destination');
 
-    // ─ Map mode toggle (Set Pickup / Set Drop) ─────────────────────────────
+    // Map mode toggle
     const modePickupBtn = document.getElementById('modePickup');
     const modeDropBtn   = document.getElementById('modeDrop');
     const mapHint       = document.getElementById('mapHint');
@@ -237,59 +330,26 @@ document.addEventListener('DOMContentLoaded', function () {
     modePickupBtn.addEventListener('click', () => setMode('pickup'));
     modeDropBtn.addEventListener('click',   () => setMode('drop'));
 
-    // ─ Search Pickup address ──────────────────────────────────────────────
-    document.getElementById('searchPickup').addEventListener('click', async function () {
-        const q = document.getElementById('pickupAddress').value.trim();
-        if (!q) { alert('Please enter a pickup address first.'); return; }
-        btnLoading(this, true);
-        try {
-            const r = await geocodeAddress(q);
-            document.getElementById('pickupAddress').value = r.display;
-            await setPickupCoords(r.lat, r.lng, false);
-            setCoordBadge('pickup', r.lat, r.lng, r.display.split(',').slice(0, 3).join(','));
-            updateHiddenFields();
-        } catch { alert('Address not found. Try a more specific query.'); }
-        btnLoading(this, false);
-    });
-
-    // ─ Search Drop address ────────────────────────────────────────────────
-    document.getElementById('searchDrop').addEventListener('click', async function () {
-        const q = document.getElementById('destination').value.trim();
-        if (!q) { alert('Please enter a drop address first.'); return; }
-        btnLoading(this, true);
-        try {
-            const r = await geocodeAddress(q);
-            document.getElementById('destination').value = r.display;
-            await setDropCoords(r.lat, r.lng, false);
-            setCoordBadge('drop', r.lat, r.lng, r.display.split(',').slice(0, 3).join(','));
-            updateHiddenFields();
-        } catch { alert('Address not found. Try a more specific query.'); }
-        btnLoading(this, false);
-    });
-
-    // ─ GPS: Use My Location for pickup ──────────────────────────────────────
+    // GPS: My Location
     document.getElementById('useMyLocation').addEventListener('click', function () {
         if (!navigator.geolocation) { alert('Geolocation not supported by your browser.'); return; }
         const btn = this;
         btnLoading(btn, true);
         navigator.geolocation.getCurrentPosition(
-            async function (pos) {
+            async (pos) => {
                 await setPickupCoords(pos.coords.latitude, pos.coords.longitude, true);
-                setMode('drop');        // auto-switch so user pins drop next
+                setMode('drop');
                 btnLoading(btn, false);
             },
-            function () {
-                alert('Location access denied or unavailable. Please allow location and try again.');
-                btnLoading(btn, false);
-            },
+            () => { alert('Location access denied.'); btnLoading(btn, false); },
             { enableHighAccuracy: true, timeout: 10000 }
         );
     });
 
-    // ─ Mobile nav toggle ───────────────────────────────────────────────────
+    // Mobile nav
     const navToggle = document.getElementById('navToggle');
     const navLinks  = document.getElementById('navLinks');
-    navToggle.addEventListener('click', function () {
+    navToggle.addEventListener('click', () => {
         const open = navLinks.classList.toggle('open');
         navToggle.setAttribute('aria-expanded', String(open));
         navToggle.querySelector('i').className = open ? 'fa-solid fa-xmark' : 'fa-solid fa-bars';
@@ -300,26 +360,23 @@ document.addEventListener('DOMContentLoaded', function () {
         navToggle.querySelector('i').className = 'fa-solid fa-bars';
     }));
 
-    // ─ Phone: digits only, max 10 ────────────────────────────────────────────
+    // Phone digits only
     document.getElementById('phone').addEventListener('input', function () {
         this.value = this.value.replace(/\D/g, '').slice(0, 10);
     });
 
-    // ─ Smooth scroll ────────────────────────────────────────────────────────
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-        anchor.addEventListener('click', function (e) {
+    // Smooth scroll
+    document.querySelectorAll('a[href^="#"]').forEach(a => {
+        a.addEventListener('click', function (e) {
             const target = document.querySelector(this.getAttribute('href'));
-            if (target) {
-                e.preventDefault();
-                const top = target.getBoundingClientRect().top + window.pageYOffset - 80;
-                window.scrollTo({ top, behavior: 'smooth' });
-                // After scroll, tell Leaflet to re-measure its container
-                if (map) setTimeout(() => map.invalidateSize(), 400);
-            }
+            if (!target) return;
+            e.preventDefault();
+            window.scrollTo({ top: target.getBoundingClientRect().top + window.pageYOffset - 80, behavior: 'smooth' });
+            if (map) setTimeout(() => map.invalidateSize(), 400);
         });
     });
 
-    // ─ Form submit ────────────────────────────────────────────────────────────
+    // Form submit
     document.getElementById('bookingForm').addEventListener('submit', function (e) {
         e.preventDefault();
         if (!this.checkValidity()) { this.reportValidity(); return; }
@@ -346,7 +403,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 // ── Google Forms submission ─────────────────────────────────────────────────────
 function submitToGoogleForms(data) {
-    const GOOGLE_FORM_ACTION_URL = 'YOUR_GOOGLE_FORM_ACTION_URL'; // ← replace
+    const GOOGLE_FORM_ACTION_URL = 'YOUR_GOOGLE_FORM_ACTION_URL';
     const params = new URLSearchParams({
         'entry.NAME_ENTRY_ID':        data.name,
         'entry.PHONE_ENTRY_ID':       data.phone,
@@ -365,11 +422,10 @@ function submitToGoogleForms(data) {
         'entry.DROP_MAP_ENTRY_ID':    data.dropMapUrl,
         'entry.ROUTE_MAP_ENTRY_ID':   data.routeMapUrl
     });
-
     const iframe = document.createElement('iframe');
-    iframe.style.display = 'none'; iframe.name = 'hf_iframe';
+    iframe.style.display = 'none'; iframe.name = 'hf';
     const form = document.createElement('form');
-    form.target = 'hf_iframe'; form.method = 'POST'; form.action = GOOGLE_FORM_ACTION_URL;
+    form.target = 'hf'; form.method = 'POST'; form.action = GOOGLE_FORM_ACTION_URL;
     params.forEach((v, k) => {
         const i = document.createElement('input');
         i.type = 'hidden'; i.name = k; i.value = v; form.appendChild(i);
