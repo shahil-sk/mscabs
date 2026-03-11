@@ -470,38 +470,70 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ── Google Forms submission ─────────────────────────────────────────────────────
 function submitToGoogleForms(data) {
-    const GOOGLE_FORM_ACTION_URL = 'YOUR_GOOGLE_FORM_ACTION_URL';
+    const GOOGLE_FORM_ACTION_URL =
+      'https://docs.google.com/forms/d/e/1FAIpQLSctSNxP_rtf4ab-QL6UDzbGkvdDyeSFC4pqyh8w3jvsCRlz2g/formResponse';
+
+    const extras =
+      `PickupLat: ${data.pickupLat}, PickupLng: ${data.pickupLng}\n` +
+      `DropLat: ${data.dropLat}, DropLng: ${data.dropLng}\n` +
+      `PickupMap: ${data.pickupMapUrl}\n` +
+      `DropMap: ${data.dropMapUrl}\n` +
+      `RouteMap: ${data.routeMapUrl}`;
+
     const params = new URLSearchParams({
-        'entry.NAME_ENTRY_ID':        data.name,
-        'entry.PHONE_ENTRY_ID':       data.phone,
-        'entry.SERVICE_ENTRY_ID':     data.serviceType,
-        'entry.VEHICLE_ENTRY_ID':     data.vehicleType,
-        'entry.PICKUP_ENTRY_ID':      data.pickupAddress,
-        'entry.DESTINATION_ENTRY_ID': data.destination,
-        'entry.DATE_ENTRY_ID':        data.date,
-        'entry.TIME_ENTRY_ID':        data.time,
-        'entry.COMMENTS_ENTRY_ID':    data.comments,
-        'entry.PICKUP_LAT_ENTRY_ID':  data.pickupLat,
-        'entry.PICKUP_LNG_ENTRY_ID':  data.pickupLng,
-        'entry.DROP_LAT_ENTRY_ID':    data.dropLat,
-        'entry.DROP_LNG_ENTRY_ID':    data.dropLng,
-        'entry.PICKUP_MAP_ENTRY_ID':  data.pickupMapUrl,
-        'entry.DROP_MAP_ENTRY_ID':    data.dropMapUrl,
-        'entry.ROUTE_MAP_ENTRY_ID':   data.routeMapUrl
+      // Name
+      'entry.1731902692': data.name,
+      // Phone
+      'entry.970216848': data.phone,
+      // Service type
+      'entry.1336383824': data.serviceType,
+      // Vehicle type
+      'entry.1115489851': data.vehicleType,
+      // Pickup address
+      'entry.1385388401': data.pickupAddress,
+      // Drop address
+      'entry.827208412': data.destination,
+      // Date (you can format if you prefer dd/MM)
+      'entry.2102662793': data.date,
+      // Time
+      'entry.506366157': data.time,
+      // Comments
+      'entry.1841962630': data.comments,
+      // Pickup lat
+      'entry.1173550631': data.pickupLat,
+      // Pickup lng
+      'entry.1785285242': data.pickupLng,
+      // Everything else (drop coords + URLs)
+      'entry.425635662': extras
     });
+
     const iframe = document.createElement('iframe');
-    iframe.style.display = 'none'; iframe.name = 'hf';
+    iframe.style.display = 'none';
+    iframe.name = 'hf';
+
     const form = document.createElement('form');
-    form.target = 'hf'; form.method = 'POST'; form.action = GOOGLE_FORM_ACTION_URL;
+    form.target = 'hf';
+    form.method = 'POST';
+    form.action = GOOGLE_FORM_ACTION_URL;
+
     params.forEach((v, k) => {
-        const i = document.createElement('input');
-        i.type = 'hidden'; i.name = k; i.value = v; form.appendChild(i);
+      const i = document.createElement('input');
+      i.type = 'hidden';
+      i.name = k;
+      i.value = v;
+      form.appendChild(i);
     });
+
     document.body.appendChild(iframe);
     document.body.appendChild(form);
     form.submit();
+
     showSuccessMessage();
-    setTimeout(() => { document.body.removeChild(form); document.body.removeChild(iframe); }, 1500);
+
+    setTimeout(() => {
+      document.body.removeChild(form);
+      document.body.removeChild(iframe);
+    }, 1500);
 }
 
 // ── Success toast ──────────────────────────────────────────────────────────────
