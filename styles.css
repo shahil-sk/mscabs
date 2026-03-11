@@ -70,8 +70,7 @@ ul { list-style: none; }
 .btn {
     display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px;
     border-radius: 50px; font-weight: 600; font-size: 1rem; cursor: pointer;
-    transition: all var(--transition); border: 2px solid transparent;
-    letter-spacing: 0.3px; text-decoration: none;
+    transition: all var(--transition); border: 2px solid transparent; letter-spacing: 0.3px; text-decoration: none;
 }
 .btn-primary { background: var(--primary); color: var(--secondary); border-color: var(--primary); }
 .btn-primary:hover, .btn-primary:focus { background: var(--primary-dark); border-color: var(--primary-dark); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(253,185,19,0.35); outline: none; }
@@ -100,14 +99,12 @@ ul { list-style: none; }
 .services-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 28px; }
 .service-card {
     background: var(--bg-white); border-radius: var(--radius); padding: 36px 28px; text-align: center;
-    box-shadow: var(--shadow); transition: transform var(--transition), box-shadow var(--transition);
-    border: 2px solid transparent;
+    box-shadow: var(--shadow); transition: transform var(--transition), box-shadow var(--transition); border: 2px solid transparent;
 }
 .service-card:hover { transform: translateY(-6px); box-shadow: var(--shadow-hover); border-color: var(--primary); }
 .service-icon {
     width: 72px; height: 72px; background: rgba(253,185,19,0.12); border-radius: 50%;
-    display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;
-    transition: background var(--transition);
+    display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; transition: background var(--transition);
 }
 .service-icon i { font-size: 2rem; color: var(--primary); }
 .service-card:hover .service-icon { background: var(--primary); }
@@ -120,24 +117,19 @@ ul { list-style: none; }
 .fleet-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 28px; }
 .fleet-card {
     background: var(--bg-white); border-radius: var(--radius); padding: 36px 24px; text-align: center;
-    box-shadow: var(--shadow); transition: transform var(--transition), box-shadow var(--transition);
-    border: 2px solid transparent;
+    box-shadow: var(--shadow); transition: transform var(--transition), box-shadow var(--transition); border: 2px solid transparent;
 }
 .fleet-card:hover { transform: translateY(-6px); box-shadow: var(--shadow-hover); border-color: var(--primary); }
 .fleet-image {
     width: 90px; height: 90px; background: rgba(253,185,19,0.1); border-radius: 50%;
-    display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;
-    transition: background var(--transition);
+    display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; transition: background var(--transition);
 }
 .fleet-image i { font-size: 2.4rem; color: var(--primary); }
 .fleet-card:hover .fleet-image { background: var(--primary); }
 .fleet-card:hover .fleet-image i { color: var(--secondary); }
 .fleet-card h3 { font-size: 1.2rem; font-weight: 700; margin-bottom: 8px; color: var(--secondary); }
 .fleet-card p { color: var(--text-light); font-size: 0.9rem; margin-bottom: 12px; }
-.capacity {
-    display: inline-flex; align-items: center; gap: 6px; background: var(--bg-light);
-    padding: 6px 14px; border-radius: 20px; font-size: 0.82rem; color: var(--text); font-weight: 500;
-}
+.capacity { display: inline-flex; align-items: center; gap: 6px; background: var(--bg-light); padding: 6px 14px; border-radius: 20px; font-size: 0.82rem; color: var(--text); font-weight: 500; }
 
 /* ===== Booking ===== */
 .booking { padding: 80px 0; background: var(--bg-light); }
@@ -165,19 +157,21 @@ ul { list-style: none; }
 
 /* ===== Location Input Row ===== */
 .location-input-row { display: flex; gap: 8px; align-items: flex-start; }
-.location-input-row textarea { flex: 1; }
+.location-input-row textarea { flex: 1; min-width: 0; }
 .location-btn-group { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
 .loc-btn {
-    display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px;
-    border: none; border-radius: var(--radius-sm); font-size: 0.82rem; font-weight: 600;
-    cursor: pointer; white-space: nowrap; transition: all var(--transition);
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 9px 13px; border: none; border-radius: var(--radius-sm);
+    font-size: 0.8rem; font-weight: 600; cursor: pointer; white-space: nowrap;
+    transition: all var(--transition); font-family: inherit;
 }
-.loc-search { background: var(--secondary); color: var(--bg-white); }
-.loc-search:hover { background: #333; }
-.loc-gps { background: #22c55e; color: white; }
-.loc-gps:hover { background: #16a34a; }
+.loc-search { background: var(--secondary); color: #fff; }
+.loc-search:hover:not(:disabled) { background: #333; }
+.loc-gps { background: #22c55e; color: #fff; }
+.loc-gps:hover:not(:disabled) { background: #16a34a; }
+.loc-btn:disabled { cursor: not-allowed; }
 
-/* ===== Coordinate Badge ===== */
+/* ===== Coord Badge ===== */
 .coord-badge {
     display: flex; align-items: center; gap: 8px; margin-top: 6px;
     background: #f0fdf4; border: 1px solid #86efac; border-radius: var(--radius-sm);
@@ -204,31 +198,40 @@ ul { list-style: none; }
     display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px;
     border: 1px solid rgba(255,255,255,0.2); border-radius: 20px;
     background: rgba(255,255,255,0.05); color: #ccc;
-    font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all var(--transition);
+    font-size: 0.8rem; font-weight: 600; cursor: pointer;
+    transition: all var(--transition); font-family: inherit;
 }
 .map-mode-btn.active { background: var(--primary); color: var(--secondary); border-color: var(--primary); }
-.map-mode-btn:hover:not(.active) { background: rgba(255,255,255,0.1); }
-#map { height: 340px; width: 100%; }
+.map-mode-btn:hover:not(.active) { background: rgba(255,255,255,0.12); color: #fff; }
+
+/* CRITICAL: map div must have explicit height or Leaflet renders blank */
+#map {
+    height: 360px;
+    width: 100%;
+    display: block;
+    background: #e8e0d4;
+}
+
 .map-hint {
     padding: 8px 16px; background: #fffbeb; border-top: 1px solid #fde68a;
     font-size: 0.82rem; color: #92400e; text-align: center;
 }
 
-/* ===== Leaflet custom marker ===== */
-.map-marker {
-    width: 32px; height: 40px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
-    display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+/* ===== Custom SVG pin marker ===== */
+.map-pin {
+    width: 32px; height: 42px;
+    display: flex; align-items: flex-start; justify-content: center;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.35));
 }
-.map-marker i { transform: rotate(45deg); color: white; font-size: 1rem; }
+.map-pin svg { width: 32px; height: 42px; }
 
 /* ===== Route link button ===== */
 .route-link-btn {
     display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px;
-    background: #1d4ed8; color: white; border-radius: var(--radius-sm);
+    background: #1d4ed8; color: #fff; border-radius: var(--radius-sm);
     font-size: 0.88rem; font-weight: 600; transition: background var(--transition);
 }
-.route-link-btn:hover { background: #1e40af; color: white; }
+.route-link-btn:hover { background: #1e40af; color: #fff; }
 
 /* ===== Contact Sidebar ===== */
 .contact-sidebar { display: flex; flex-direction: column; gap: 20px; }
@@ -240,10 +243,9 @@ ul { list-style: none; }
     display: flex; align-items: center; gap: 14px;
     background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
     border-radius: var(--radius-sm); padding: 14px 16px; margin-bottom: 12px;
-    transition: background var(--transition), border-color var(--transition);
-    text-decoration: none; color: var(--bg-white);
+    transition: background var(--transition), border-color var(--transition); text-decoration: none; color: var(--bg-white);
 }
-.contact-btn:hover, .contact-btn:focus { background: rgba(253,185,19,0.12); border-color: var(--primary); outline: none; }
+.contact-btn:hover { background: rgba(253,185,19,0.12); border-color: var(--primary); }
 .contact-btn i { font-size: 1.6rem; color: var(--primary); flex-shrink: 0; }
 .contact-btn .fa-whatsapp { color: #25D366; }
 .contact-label { display: block; font-size: 0.78rem; color: #aaa; }
@@ -286,8 +288,8 @@ ul { list-style: none; }
 .footer-section p { color: #aaa; font-size: 0.88rem; line-height: 1.7; }
 .social-links { display: flex; gap: 12px; margin-top: 16px; }
 .social-links a {
-    width: 38px; height: 38px; background: rgba(255,255,255,0.07);
-    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    width: 38px; height: 38px; background: rgba(255,255,255,0.07); border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
     color: #ccc; font-size: 1rem; transition: background var(--transition), color var(--transition);
 }
 .social-links a:hover { background: var(--primary); color: var(--secondary); }
@@ -309,6 +311,11 @@ ul { list-style: none; }
 }
 .whatsapp-float:hover { transform: scale(1.1); box-shadow: 0 6px 28px rgba(37,211,102,0.55); }
 
+/* ===== Leaflet overrides ===== */
+/* Keep Leaflet controls above our sticky header */
+.leaflet-top { z-index: 400 !important; }
+.leaflet-pane { z-index: 300 !important; }
+
 /* ===== Responsive ===== */
 @media (max-width: 900px) {
     .booking-container { grid-template-columns: 1fr; }
@@ -320,7 +327,7 @@ ul { list-style: none; }
         display: none; flex-direction: column;
         position: absolute; top: 64px; left: 0; right: 0;
         background: var(--secondary); padding: 16px 20px; gap: 4px;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        box-shadow: 0 8px 24px rgba(0,0,0,0.3); z-index: 999;
     }
     .nav-links.open { display: flex; }
     .hero { padding: 70px 0 60px; }
@@ -329,12 +336,14 @@ ul { list-style: none; }
     .trust-grid { gap: 16px; justify-content: flex-start; }
     .services-grid, .fleet-grid { grid-template-columns: 1fr; }
     .location-input-row { flex-direction: column; }
-    .location-btn-group { flex-direction: row; }
-    #map { height: 260px; }
-    .map-mode-toggle { flex-wrap: wrap; }
+    .location-btn-group { flex-direction: row; flex-wrap: wrap; }
+    #map { height: 280px; }
+    .map-mode-toggle { flex-wrap: wrap; gap: 6px; }
+    .map-panel-header { gap: 8px; }
 }
 @media (max-width: 480px) {
     .cta-buttons { flex-direction: column; align-items: center; }
     .btn { width: 100%; max-width: 300px; justify-content: center; }
     .whatsapp-float { bottom: 16px; right: 16px; width: 50px; height: 50px; font-size: 1.5rem; }
+    #map { height: 240px; }
 }
