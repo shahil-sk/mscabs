@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://shahil-sk.github.io/mscabs/sitemap.xml

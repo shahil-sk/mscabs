@@ -1,40 +1,70 @@
-// Form submission handler
-document.addEventListener('DOMContentLoaded', function() {
-    const bookingForm = document.getElementById('bookingForm');
-
-    // Set minimum date to today
+document.addEventListener('DOMContentLoaded', function () {
+    // === Set minimum date ===
     const dateInput = document.getElementById('date');
     const today = new Date().toISOString().split('T')[0];
     dateInput.setAttribute('min', today);
 
-    bookingForm.addEventListener('submit', function(e) {
-        e.preventDefault();
+    // === Mobile Nav Toggle ===
+    const navToggle = document.getElementById('navToggle');
+    const navLinks = document.getElementById('navLinks');
+    navToggle.addEventListener('click', function () {
+        const open = navLinks.classList.toggle('open');
+        navToggle.setAttribute('aria-expanded', open);
+        navToggle.querySelector('i').className = open ? 'fa-solid fa-xmark' : 'fa-solid fa-bars';
+    });
+    // Close nav on link click
+    navLinks.querySelectorAll('a').forEach(link => {
+        link.addEventListener('click', () => {
+            navLinks.classList.remove('open');
+            navToggle.setAttribute('aria-expanded', 'false');
+            navToggle.querySelector('i').className = 'fa-solid fa-bars';
+        });
+    });
 
-        // Get form data
+    // === Booking Form Submit ===
+    const bookingForm = document.getElementById('bookingForm');
+    bookingForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        if (!bookingForm.checkValidity()) {
+            bookingForm.reportValidity();
+            return;
+        }
         const formData = {
-            name: document.getElementById('name').value,
-            phone: document.getElementById('phone').value,
+            name: document.getElementById('name').value.trim(),
+            phone: document.getElementById('phone').value.trim(),
             serviceType: document.getElementById('serviceType').value,
             vehicleType: document.getElementById('vehicleType').value,
-            pickupAddress: document.getElementById('pickupAddress').value,
-            destination: document.getElementById('destination').value,
+            pickupAddress: document.getElementById('pickupAddress').value.trim(),
+            destination: document.getElementById('destination').value.trim(),
             date: document.getElementById('date').value,
             time: document.getElementById('time').value,
-            comments: document.getElementById('comments').value
+            comments: document.getElementById('comments').value.trim()
         };
-
-        // Submit to Google Forms
         submitToGoogleForms(formData);
+    });
+
+    // === Phone input: digits only, max 10 ===
+    document.getElementById('phone').addEventListener('input', function (e) {
+        e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10);
+    });
+
+    // === Smooth scroll ===
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) {
+                e.preventDefault();
+                const offset = target.getBoundingClientRect().top + window.pageYOffset - 80;
+                window.scrollTo({ top: offset, behavior: 'smooth' });
+            }
+        });
     });
 });
 
-// Google Forms submission function
+// === Google Forms submission ===
 function submitToGoogleForms(data) {
-    // IMPORTANT: Replace this URL with your actual Google Form action URL
-    // See setup instructions in SETUP_INSTRUCTIONS.txt
+    // Replace with your actual Google Form action URL and entry IDs
     const GOOGLE_FORM_ACTION_URL = 'YOUR_GOOGLE_FORM_ACTION_URL';
-
-    // Replace these entry IDs with your actual Google Form field entry IDs
     const formParams = new URLSearchParams({
         'entry.NAME_ENTRY_ID': data.name,
         'entry.PHONE_ENTRY_ID': data.phone,
@@ -46,20 +76,14 @@ function submitToGoogleForms(data) {
         'entry.TIME_ENTRY_ID': data.time,
         'entry.COMMENTS_ENTRY_ID': data.comments
     });
-
-    // Create iframe for form submission
     const iframe = document.createElement('iframe');
     iframe.style.display = 'none';
     iframe.name = 'hidden_iframe';
     document.body.appendChild(iframe);
-
-    // Create form element
     const form = document.createElement('form');
     form.target = 'hidden_iframe';
     form.method = 'POST';
     form.action = GOOGLE_FORM_ACTION_URL;
-
-    // Add form parameters
     formParams.forEach((value, key) => {
         const input = document.createElement('input');
         input.type = 'hidden';
@@ -67,70 +91,27 @@ function submitToGoogleForms(data) {
         input.value = value;
         form.appendChild(input);
     });
-
-    // Submit form
     document.body.appendChild(form);
     form.submit();
-
-    // Show success message
     showSuccessMessage();
-
-    // Clean up
     setTimeout(() => {
         document.body.removeChild(form);
         document.body.removeChild(iframe);
     }, 1000);
 }
 
-// Show success message
+// === Success message ===
 function showSuccessMessage() {
-    // Create success message element if it doesn't exist
-    let successMessage = document.querySelector('.success-message');
-    if (!successMessage) {
-        successMessage = document.createElement('div');
-        successMessage.className = 'success-message';
-        const bookingForm = document.getElementById('bookingForm');
-        bookingForm.insertBefore(successMessage, bookingForm.firstChild);
+    let msg = document.querySelector('.success-message');
+    if (!msg) {
+        msg = document.createElement('div');
+        msg.className = 'success-message';
+        const form = document.getElementById('bookingForm');
+        form.insertBefore(msg, form.firstChild);
     }
-
-    successMessage.innerHTML = '<strong>Booking Request Submitted!</strong><p>Thank you for your booking. We will contact you shortly to confirm your ride.</p>';
-    successMessage.classList.add('show');
-
-    // Reset form
+    msg.innerHTML = '<strong>&#10003; Booking Request Submitted!</strong><p>Thank you! We will call you shortly to confirm your ride.</p>';
+    msg.classList.add('show');
     document.getElementById('bookingForm').reset();
-
-    // Hide success message after 5 seconds
-    setTimeout(() => {
-        successMessage.classList.remove('show');
-    }, 5000);
-
-    // Scroll to success message
-    successMessage.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    msg.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    setTimeout(() => msg.classList.remove('show'), 6000);
 }
-
-// Smooth scroll for navigation links
-document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-    anchor.addEventListener('click', function (e) {
-        e.preventDefault();
-        const target = document.querySelector(this.getAttribute('href'));
-        if (target) {
-            const headerOffset = 80;
-            const elementPosition = target.getBoundingClientRect().top;
-            const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-
-            window.scrollTo({
-                top: offsetPosition,
-                behavior: 'smooth'
-            });
-        }
-    });
-});
-
-// Phone number formatting
-document.getElementById('phone').addEventListener('input', function(e) {
-    let value = e.target.value.replace(/\D/g, '');
-    if (value.length > 10) {
-        value = value.slice(0, 10);
-    }
-    e.target.value = value;
-});
