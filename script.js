@@ -1,6 +1,6 @@
 /* =============================================
    MS Cabs – script.js
-   Leaflet map + Nominatim autocomplete
+   Leaflet map + Nominatim autocomplete + Price estimator
 ============================================= */
 
 // ── Nominatim helpers ──────────────────────────────────────────────────────────
@@ -32,6 +32,67 @@ function osmRouteUrl(pLat, pLng, dLat, dLng) {
 function debounce(fn, ms) {
     let t;
     return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+
+// ── Pricing config ────────────────────────────────────────────────────────────
+// Base rates (₹/km) & minimum fares per vehicle
+const PRICE_CONFIG = {
+    Sedan:     { perKm: 12,  minFare: 300  },
+    SUV:       { perKm: 16,  minFare: 500  },
+    Hatchback: { perKm: 10,  minFare: 250  }
+};
+
+// Service-type multiplier (outstation adds driver allowance buffer)
+const SERVICE_MULTIPLIER = {
+    Outstation: 1.15,
+    Local:      1.00,
+    Airport:    1.10,
+    '':         1.00
+};
+
+// Road-distance factor: straight-line × 1.3 approximates road distance
+const ROAD_FACTOR = 1.3;
+
+// ── Haversine distance (km) ───────────────────────────────────────────────────
+function haversineKm(lat1, lng1, lat2, lng2) {
+    const R  = 6371;
+    const dL = (lat2 - lat1) * Math.PI / 180;
+    const dG = (lng2 - lng1) * Math.PI / 180;
+    const a  = Math.sin(dL / 2) ** 2 +
+               Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+               Math.sin(dG / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// ── Compute & render price estimate ──────────────────────────────────────────
+function updatePriceEstimate() {
+    const card = document.getElementById('priceEstimateCard');
+    if (!state.pickupCoords || !state.dropCoords) { card.hidden = true; return; }
+
+    const vehicleType  = document.getElementById('vehicleType').value  || 'Sedan';
+    const serviceType  = document.getElementById('serviceType').value  || '';
+    const cfg          = PRICE_CONFIG[vehicleType] || PRICE_CONFIG.Sedan;
+    const multiplier   = SERVICE_MULTIPLIER[serviceType] || 1.00;
+
+    const straightKm   = haversineKm(
+        state.pickupCoords.lat, state.pickupCoords.lng,
+        state.dropCoords.lat,   state.dropCoords.lng
+    );
+    const roadKm       = straightKm * ROAD_FACTOR;
+    const rawFare      = roadKm * cfg.perKm * multiplier;
+    const fare         = Math.max(rawFare, cfg.minFare);
+
+    // Low / high band: ±10%
+    const low  = Math.round(fare * 0.9  / 10) * 10;
+    const high = Math.round(fare * 1.1  / 10) * 10;
+
+    document.getElementById('priceDistance').textContent  = roadKm.toFixed(1);
+    document.getElementById('priceVehicle').textContent   = vehicleType;
+    document.getElementById('priceService').textContent   = serviceType || 'Not selected';
+    document.getElementById('priceRate').textContent      = `₹${cfg.perKm}/km`;
+    document.getElementById('priceLow').textContent       = `₹${low.toLocaleString('en-IN')}`;
+    document.getElementById('priceHigh').textContent      = `₹${high.toLocaleString('en-IN')}`;
+    card.hidden = false;
 }
 
 // ── App state ───────────────────────────────────────────────────────────────────
@@ -89,7 +150,6 @@ function initMap() {
     map.on('focus', () => map.scrollWheelZoom.enable());
     map.on('blur',  () => map.scrollWheelZoom.disable());
 
-    // Give the browser one frame to lay out the container then fix tile render
     requestAnimationFrame(() => map.invalidateSize());
 
     map.on('click', async (e) => {
@@ -123,6 +183,7 @@ async function setPickupCoords(lat, lng, doReverse) {
     }
     updateHiddenFields();
     updateRouteLink();
+    updatePriceEstimate();
     map.panTo([lat, lng]);
 }
 
@@ -151,6 +212,7 @@ async function setDropCoords(lat, lng, doReverse) {
     }
     updateHiddenFields();
     updateRouteLink();
+    updatePriceEstimate();
     map.panTo([lat, lng]);
 }
 
@@ -221,7 +283,7 @@ function showSuggestions(type, results) {
                           <small>${item.display_name.split(',').slice(1, 4).join(',').trim()}</small>
                         </span>`;
         li.addEventListener('mousedown', (e) => {
-            e.preventDefault(); // keep focus on input
+            e.preventDefault();
             selectSuggestion(type, item);
         });
         list.appendChild(li);
@@ -261,6 +323,7 @@ async function selectSuggestion(type, item) {
         setCoordBadge('drop', lat, lng, addr.split(',').slice(0, 3).join(','));
     }
     updateHiddenFields();
+    updatePriceEstimate();
 }
 
 function setupAutocomplete(type, inputId) {
@@ -313,6 +376,10 @@ document.addEventListener('DOMContentLoaded', () => {
     initMap();
     setupAutocomplete('pickup', 'pickupAddress');
     setupAutocomplete('drop',   'destination');
+
+    // Re-calculate when vehicle or service type changes
+    document.getElementById('vehicleType').addEventListener('change', updatePriceEstimate);
+    document.getElementById('serviceType').addEventListener('change', updatePriceEstimate);
 
     // Map mode toggle
     const modePickupBtn = document.getElementById('modePickup');
