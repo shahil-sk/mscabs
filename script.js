@@ -35,14 +35,12 @@ function debounce(fn, ms) {
 }
 
 // ── Pricing config ────────────────────────────────────────────────────────────
-// Base rates (₹/km) & minimum fares per vehicle
 const PRICE_CONFIG = {
     Sedan:     { perKm: 12,  minFare: 300  },
     SUV:       { perKm: 16,  minFare: 500  },
     Hatchback: { perKm: 10,  minFare: 250  }
 };
 
-// Service-type multiplier (outstation adds driver allowance buffer)
 const SERVICE_MULTIPLIER = {
     Outstation: 1.15,
     Local:      1.00,
@@ -50,7 +48,6 @@ const SERVICE_MULTIPLIER = {
     '':         1.00
 };
 
-// Road-distance factor: straight-line × 1.3 approximates road distance
 const ROAD_FACTOR = 1.3;
 
 // ── Haversine distance (km) ───────────────────────────────────────────────────
@@ -82,7 +79,6 @@ function updatePriceEstimate() {
     const rawFare      = roadKm * cfg.perKm * multiplier;
     const fare         = Math.max(rawFare, cfg.minFare);
 
-    // Low / high band: ±10%
     const low  = Math.round(fare * 0.9  / 10) * 10;
     const high = Math.round(fare * 1.1  / 10) * 10;
 
@@ -108,7 +104,7 @@ const state = {
     mode: 'pickup'
 };
 
-// ── Build Leaflet icons (must be called after L is available) ─────────────────
+// ── Build Leaflet icons ─────────────────────────────────────────────────────
 function buildIcons() {
     function pin(color, label) {
         return L.divIcon({
@@ -139,8 +135,11 @@ function initMap() {
 
     buildIcons();
 
-    map = L.map('map', { scrollWheelZoom: false })
-           .setView([12.2958, 76.6394], 12);
+    map = L.map('map', {
+        scrollWheelZoom: false,
+        // Prevent Leaflet from applying its own tap handler that can misfire on mobile
+        tap: false
+    }).setView([12.2958, 76.6394], 12);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
@@ -150,7 +149,18 @@ function initMap() {
     map.on('focus', () => map.scrollWheelZoom.enable());
     map.on('blur',  () => map.scrollWheelZoom.disable());
 
+    // Initial size correction
     requestAnimationFrame(() => map.invalidateSize());
+
+    // Fix layout after any resize or orientation change
+    const resizeObserver = new ResizeObserver(() => {
+        if (map) map.invalidateSize();
+    });
+    resizeObserver.observe(document.getElementById('map'));
+
+    window.addEventListener('orientationchange', () => {
+        setTimeout(() => { if (map) map.invalidateSize(); }, 300);
+    });
 
     map.on('click', async (e) => {
         if (state.mode === 'pickup') await setPickupCoords(e.latlng.lat, e.latlng.lng, true);
@@ -377,7 +387,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setupAutocomplete('pickup', 'pickupAddress');
     setupAutocomplete('drop',   'destination');
 
-    // Re-calculate when vehicle or service type changes
     document.getElementById('vehicleType').addEventListener('change', updatePriceEstimate);
     document.getElementById('serviceType').addEventListener('change', updatePriceEstimate);
 
@@ -432,7 +441,7 @@ document.addEventListener('DOMContentLoaded', () => {
         this.value = this.value.replace(/\D/g, '').slice(0, 10);
     });
 
-    // Smooth scroll
+    // Smooth scroll – also invalidate map size after scroll completes
     document.querySelectorAll('a[href^="#"]').forEach(a => {
         a.addEventListener('click', function (e) {
             const target = document.querySelector(this.getAttribute('href'));
@@ -481,29 +490,17 @@ function submitToGoogleForms(data) {
       `RouteMap: ${data.routeMapUrl}`;
 
     const params = new URLSearchParams({
-      // Name
       'entry.1731902692': data.name,
-      // Phone
       'entry.970216848': data.phone,
-      // Service type
       'entry.1336383824': data.serviceType,
-      // Vehicle type
       'entry.1115489851': data.vehicleType,
-      // Pickup address
       'entry.1385388401': data.pickupAddress,
-      // Drop address
       'entry.827208412': data.destination,
-      // Date (you can format if you prefer dd/MM)
       'entry.2102662793': data.date,
-      // Time
       'entry.506366157': data.time,
-      // Comments
       'entry.1841962630': data.comments,
-      // Pickup lat
       'entry.1173550631': data.pickupLat,
-      // Pickup lng
       'entry.1785285242': data.pickupLng,
-      // Everything else (drop coords + URLs)
       'entry.425635662': extras
     });
 
